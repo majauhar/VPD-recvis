@@ -104,7 +104,8 @@ def main(args):
                                                    sampler=test_sampler, num_workers=args.workers)
     print(args.model)
     
-    single_model = VPDRefer(sd_path='../checkpoints/v1-5-pruned-emaonly.ckpt',
+    # previously "v1-5-pruned-emaonly"
+    single_model = VPDRefer(sd_path='../checkpoints/v1-5-pruned.ckpt',
                       neck_dim=[320,640+args.token_length,1280+args.token_length,1280]
                       )
 

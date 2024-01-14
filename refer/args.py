@@ -17,7 +17,7 @@ def get_parser():
     parser.add_argument('--img_size', default=480, type=int, help='input image size')
     parser.add_argument("--local_rank", type=int, help='local rank for DistributedDataParallel')
     parser.add_argument('--lr', default=0.00005, type=float, help='the initial learning rate')
-    parser.add_argument('--model_id', default='vpd', help='name to identify the model')
+    parser.add_argument('--model', default='vpd', help='name to identify the model') # previously "model_id"
     parser.add_argument('--output-dir', default='./checkpoints/', help='path where to save checkpoint weights')
     parser.add_argument('--pin_mem', action='store_true',
                         help='If true, pin memory when using the data loader.')

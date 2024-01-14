@@ -1,0 +1,10 @@
+checkpoints/
+refer/__pycache__/
+vpd/__pycache__/
+refer/refer/data/
+refer/cuda-keyring_1.0-1_all.deb
+refer/data/__pycache__/
+refer/lib/__pycache__/
+refer/models_refer/__pycache__/
+refer/refer/__pycache__/
+stable-diffusion/
