@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from transformers.models.clip.modeling_clip import CLIPTextModel
 import gc
 from collections import OrderedDict
+import pdb
 
 
 def get_dataset(image_set, transform, args):
@@ -79,7 +80,9 @@ def evaluate(model, data_loader, clip_model):
                 
                 embedding = clip_model(input_ids=sentences[:, :, idx]).last_hidden_state
                 attentions = attentions.unsqueeze(dim=-1)  # (batch, N_l, 1)
+                # pdb.set_trace()
                 output = model(image, embedding)
+                # pdb.set_trace()
 
                 output = output.cpu()
                 output_mask = output.argmax(1).data.numpy()
@@ -180,16 +183,35 @@ def main(args):
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1, sampler=test_sampler, num_workers=args.workers)
 
-    model = VPDRefer(sd_path='../checkpoints/v1-5-pruned-emaonly.ckpt',
+    model = VPDRefer(sd_path='../checkpoints/v1-5-pruned.ckpt',
                       neck_dim=[320,640+args.token_length,1280+args.token_length,1280]
                       )
 
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model.cuda()
 
-
+    # temp_unet = model.unet
+    # for param in temp_unet.parameters():
+    #     param.requires_grad = False
+    # temp_encodervq = model.encoder_vq
+    # for param in temp_encodervq.parameters():
+    #     param.requires_grad = False
+    
+    # for n, p in model.named_parameters():
+    #     print('Parameter name:', n)
+    #     # print(p.data)
+    #     print('requires_grad:', p.requires_grad)
+        
+    # temp_text_adapter = model.text_adapter
+    # temp_classifier = model.classifier
+    # params_to_optimize = [
+    #     {'params': param for param in temp_text_adapter.parameters()},
+    #     {'params': param for param in temp_classifier.parameters()}
+    # ]
+    # pdb.set_trace()
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], find_unused_parameters=True)
     single_model = model.module
+    # pdb.set_trace()
 
     clip_model = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
     clip_model.cuda()
@@ -228,6 +250,10 @@ def main(args):
         {'params': no_decay, 'weight_decay': 0.0},
         {'params': decay}
     ]
+    # params_to_optimize = [
+    #     {'params': param for param in model.text_adapter.parameters()},
+    #     {'params': param for param in model.classifier.parameters()}
+    #     ]
 
     # optimizer
     optimizer = torch.optim.AdamW(params_to_optimize,
