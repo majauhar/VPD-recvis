@@ -19,6 +19,8 @@ from transformers.models.clip.modeling_clip import CLIPTextModel
 import gc
 from collections import OrderedDict
 import pdb
+import wandb
+import random
 
 
 def get_dataset(image_set, transform, args):
@@ -127,6 +129,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, epoc
 
     for data in metric_logger.log_every(data_loader, print_freq, header):
         total_its += 1
+        if total_its == 530:
+            break
         image, target, sentences, attentions = data
         image, target, sentences, attentions = image.cuda(non_blocking=True),\
                                                target.cuda(non_blocking=True),\
@@ -157,9 +161,22 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, epoc
         gc.collect()
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
+    
+    wandb.log({"training_loss": train_loss / total_its})
 
 
 def main(args):
+
+    wandb.init(
+    # set the wandb project where this run will be logged
+    project="recvis",
+    
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": args.lr,
+    "noise_scale": 0,}
+    )
+
     dataset, num_classes = get_dataset("train",
                                        get_transform(args=args),
                                        args=args)
@@ -190,9 +207,9 @@ def main(args):
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model.cuda()
 
-    # temp_unet = model.unet
-    # for param in temp_unet.parameters():
-    #     param.requires_grad = False
+    temp_unet = model.unet
+    for param in temp_unet.parameters():
+        param.requires_grad = False
     # temp_encodervq = model.encoder_vq
     # for param in temp_encodervq.parameters():
     #     param.requires_grad = False
@@ -201,7 +218,7 @@ def main(args):
     #     print('Parameter name:', n)
     #     # print(p.data)
     #     print('requires_grad:', p.requires_grad)
-        
+    
     # temp_text_adapter = model.text_adapter
     # temp_classifier = model.classifier
     # params_to_optimize = [
@@ -225,38 +242,38 @@ def main(args):
         single_model.load_state_dict(checkpoint['model'])
 
 
-    # parameters to optimize
-    lesslr_no_decay = list()
-    lesslr_decay = list()
-    no_lr = list()
-    no_decay = list()
-    decay = list()
-    for name, m in single_model.named_parameters():
-        if 'unet' in name and 'norm' in name:
-            lesslr_no_decay.append(m)
-        elif 'unet' in name:
-            lesslr_decay.append(m)
-        elif 'encoder_vq' in name:
-            no_lr.append(m)
-        elif 'norm' in name:
-            no_decay.append(m)
-        else:
-            decay.append(m)
+    # # parameters to optimize
+    # lesslr_no_decay = list()
+    # lesslr_decay = list()
+    # no_lr = list()
+    # no_decay = list()
+    # decay = list()
+    # for name, m in single_model.named_parameters():
+    #     if 'unet' in name and 'norm' in name:
+    #         lesslr_no_decay.append(m)
+    #     elif 'unet' in name:
+    #         lesslr_decay.append(m)
+    #     elif 'encoder_vq' in name:
+    #         no_lr.append(m)
+    #     elif 'norm' in name:
+    #         no_decay.append(m)
+    #     else:
+    #         decay.append(m)
 
-    params_to_optimize = [
-        {'params': lesslr_no_decay, 'weight_decay': 0.0, 'lr_scale':0.01},
-        {'params': lesslr_decay, 'lr_scale': 0.01},
-        {'params': no_lr, 'lr_scale': 0.0},
-        {'params': no_decay, 'weight_decay': 0.0},
-        {'params': decay}
-    ]
+    # params_to_optimize = [
+    #     {'params': lesslr_no_decay, 'weight_decay': 0.0, 'lr_scale':0.01},
+    #     {'params': lesslr_decay, 'lr_scale': 0.01},
+    #     {'params': no_lr, 'lr_scale': 0.0},
+    #     {'params': no_decay, 'weight_decay': 0.0},
+    #     {'params': decay}
+    # ]
     # params_to_optimize = [
     #     {'params': param for param in model.text_adapter.parameters()},
     #     {'params': param for param in model.classifier.parameters()}
     #     ]
 
     # optimizer
-    optimizer = torch.optim.AdamW(params_to_optimize,
+    optimizer = torch.optim.AdamW(model.parameters(),
                                   lr=args.lr,
                                   weight_decay=args.weight_decay,
                                   amsgrad=args.amsgrad
@@ -285,7 +302,7 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, epoch, args.print_freq,
                         iterations, clip_model)
         iou, overallIoU = evaluate(model, data_loader_test, clip_model)
-
+        wandb.log({"iou": iou, "overallIoU": overallIoU})
         print('Average object IoU {}'.format(iou))
         print('Overall IoU {}'.format(overallIoU))
         save_checkpoint = (best_oIoU < overallIoU)
@@ -302,6 +319,7 @@ def main(args):
     # summarize
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+    wandb.log({"time_per_epoch": total_time_str})
     print('Training time {}'.format(total_time_str))
 
 

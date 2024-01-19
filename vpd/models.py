@@ -281,10 +281,10 @@ class TextAdapterRefer(nn.Module):
         )
 
     def forward(self, latents, texts, gamma):
-        print(texts.shape)
+        # print(texts.shape)
         texts_after = self.fc(texts)
         texts = texts + gamma * texts_after
-        print(texts.shape)
+        # print(texts.shape)
         return texts
 
 

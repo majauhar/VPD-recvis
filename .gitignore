@@ -8,3 +8,4 @@ refer/lib/__pycache__/
 refer/models_refer/__pycache__/
 refer/refer/__pycache__/
 stable-diffusion/
+refer/wandb/
